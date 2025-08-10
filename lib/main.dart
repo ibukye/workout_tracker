@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 // ↓ SQLite(Drift)を使う場合に必要なインポート（後で追加）
-// import 'package:drift/drift.dart' as drift;
-// import 'package:drift/native.dart';
-// import 'package:path/path.dart' as p;
-// import 'package:path_provider/path_provider.dart';
-// import 'dart:io';
+import 'package:drift/drift.dart' as drift;
+import 'package:drift/native.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+
+import 'package:workout_tracker/database.dart';
+
+final db = AppDatabase();
 
 void main() {
   runApp(const WorkoutTrackerApp());
@@ -166,17 +170,16 @@ class AddWorkoutDetailScreen extends StatelessWidget {
             const SizedBox(height: 20),
             // Submit Button
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 // TODO: 入力データをSQLiteに保存する処理を追加
-                // 例:
-                // final workout = WorkoutsCompanion(
-                //   name: drift.Value(workoutName),
-                //   weight: drift.Value(int.parse(weightController.text)),
-                //   reps: drift.Value(int.parse(repsController.text)),
-                //   sets: drift.Value(int.parse(setsController.text)),
-                //   date: drift.Value(DateTime.now()),
-                // );
-                // await db.insertWorkout(workout);
+                final workout = WorkoutsCompanion(
+                  name: drift.Value(workoutName),
+                  weight: drift.Value(int.parse(weightController.text)),
+                  reps: drift.Value(int.parse(repsController.text)),
+                  sets: drift.Value(int.parse(setsController.text)),
+                  date: drift.Value(DateTime.now()),
+                );
+                await db.insertWorkout(workout);
                 Navigator.pop(context); // 入力完了後に前の画面に戻る
               },
               child: const Text('Save'),
