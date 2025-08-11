@@ -7,6 +7,9 @@ import 'package:path/path.dart' as p;
 // 自動生成ファイルのpartディレクティブ
 part 'database.g.dart'; // ←ここはdriftのコード生成で使うのでファイル名を間違えないこと
 
+// 今日の日付を取得する
+final today = DateTime.now();
+
 // ① テーブルの定義（Workoutsテーブル）
 // それぞれのカラムをどう定義するかを指定
 class Workouts extends Table {
@@ -17,7 +20,7 @@ class Workouts extends Table {
   TextColumn get name => text()();
 
   // 重量(kg)
-  IntColumn get weight => integer()();
+  RealColumn get weight => real()();
 
   // 回数(reps)
   IntColumn get reps => integer()();
@@ -48,20 +51,64 @@ class AppDatabase extends _$AppDatabase {
         .get();
   }
 
+  // 🎯 修正版：ワークアウトがある日付のみを取得（null安全）
+  Future<Set<DateTime>> getWorkoutDates() async {
+    try {
+      // まずはシンプルにすべてのワークアウトの日付を取得
+      final allWorkouts = await select(workouts).get();
+      
+      // 日付のみを抽出してSetに変換
+      final dates = allWorkouts.map((workout) {
+        final date = workout.date;
+        return DateTime(date.year, date.month, date.day);
+      }).toSet();
+      
+      return dates;
+    } catch (e) {
+      print('Error in getWorkoutDates: $e');
+      return <DateTime>{};
+    }
+  }
+
+
+  // today's ワークアウトを取得するメソッド
+  Future<Map<String, List<Workout>>> getWorkoutsByName({required DateTime today}) async {
+    // 今日の0時を作る
+    final start = DateTime(today.year, today.month, today.day);
+    // 明日の0時を作る
+    final end = start.add(Duration(days: 1));
+
+    final result = await (select(workouts)..where((tbl) => tbl.date.isBetweenValues(start, end))).get();
+
+    // 種目ごとにまとめる
+    final grouped = <String, List<Workout>>{};
+    for (final workout in result) { grouped.putIfAbsent(workout.name, () => []).add(workout); }
+    return grouped;
+  }
+
   // ④ ワークアウトを追加するメソッド
   Future<int> insertWorkout(WorkoutsCompanion workout) {
     return into(workouts).insert(workout);
   }
 
   // ⑤ 特定の種目の最大重量を取得するメソッド例
-  Future<int?> maxWeightByName(String name) {
+  Future<double?> maxWeightByName(String name) async {
     final query = customSelect(
       'SELECT MAX(weight) AS max_weight FROM workouts WHERE name = ?',
       variables: [Variable.withString(name)],
       readsFrom: {workouts},
     );
-    // 結果のマップからmax_weightをintとして取得
-    return query.map((row) => row.data['max_weight'] as int?).getSingleOrNull();
+    final row = await query.getSingleOrNull();
+    if (row == null) return null;
+    final maxWeight = row.data['max_weight'];
+    if (maxWeight == null) return null;
+    if (maxWeight is int) {
+      return maxWeight.toDouble();
+    } else if (maxWeight is double) {
+      return maxWeight;
+    } else {
+      return null;
+    }
   }
 }
 
