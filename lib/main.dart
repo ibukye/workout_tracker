@@ -1,17 +1,30 @@
 import 'package:flutter/material.dart';
 // ↓ SQLite(Drift)を使う場合に必要なインポート（後で追加）
 import 'package:drift/drift.dart' as drift;
-import 'package:drift/native.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 
 import 'package:workout_tracker/database.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:provider/provider.dart';
 
 final db = AppDatabase();
 
 void main() {
-  runApp(const WorkoutTrackerApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => SelectedDayNotifier(),
+      child: const WorkoutTrackerApp(),
+    ),
+  );
+}
+
+class SelectedDayNotifier extends ChangeNotifier {
+  DateTime _day = DateTime.now();
+  DateTime get day => _day;
+
+  void setDay(DateTime newDay) {
+    _day = newDay;
+    notifyListeners();
+  }
 }
 
 class WorkoutTrackerApp extends StatelessWidget {
@@ -39,43 +52,27 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-
-  // 各タブで表示する画面
-  final List<Widget> _pages = [
-    const HomeScreen(),
-    // TODO: ここに「記録追加画面」を作って追加してください
-    const AddWorkoutScreen(), // ←仮の画面（本当は AddWorkoutScreen() を作る）
-    // TODO: ここに「設定画面」を作って追加してください
-    const Placeholder(), // ←仮の画面（本当は SettingsScreen() を作る）
-  ];
-
-  // タブをタップしたときに呼ばれる関数
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
+  DateTime _selectedDay = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
+    final selectedDay = context.watch<SelectedDayNotifier>().day;
+    final pages = [
+      const HomeScreen(),
+      AddWorkoutScreen(selectedDay: selectedDay),
+      //const AddWorkoutScreen(),
+      const SettingsScreen(),
+    ];
+
     return Scaffold(
-      body: _pages[_selectedIndex], // 選択中の画面を表示
+      body: pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+        onTap: (index) => setState(() => _selectedIndex = index),
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'ホーム',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline),
-            label: '追加',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: '設定',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'ホーム'),
+          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: '追加'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: '設定'),
         ],
       ),
     );
@@ -83,18 +80,137 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 // Home Screen
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late Future<Map<String, List<Workout>>> _todaysWorkouts;
+  Set<DateTime> _workoutDates = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _todaysWorkouts = db.getWorkoutsByName(today: DateTime.now());
+    _loadWorkoutDates(); // 初回ロード
+  }
+
+  void _loadWorkoutDates() async {
+    try {
+      final dates = await db.getWorkoutDates();
+      setState(() {
+        _workoutDates = dates;
+      });
+    } catch (e) {
+      print('Error loading workout dates: $e');
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final selectedDay = context.watch<SelectedDayNotifier>().day;
+    _fetchWorkoutsForDay(selectedDay);
+  }
+
+  void _fetchWorkoutsForDay(DateTime day) {
+    setState(() {
+      _todaysWorkouts = db.getWorkoutsByName(today: day);
+    });
+    _loadWorkoutDates(); // 日付を再取得
+  }
+
+  // 🎯 軽量なイベント判定
+  List<dynamic> _getEventsForDay(DateTime day) {
+    final dateOnly = DateTime(day.year, day.month, day.day);
+    return _workoutDates.contains(dateOnly) ? ['workout'] : [];
+  }
 
   @override
   Widget build(BuildContext context) {
+    final selectedDay = context.watch<SelectedDayNotifier>().day;
+
     return Scaffold(
       appBar: AppBar(title: const Text('ホーム画面')),
-      body: const Center(
-        child: Text('ここに今日の記録や統計を表示します'),
-        // TODO: SQLiteから「今日の記録」を読み込んでリスト表示
-        // TODO: 総重量やMAX重量などを計算して表示
-        // TODO: 将来的にグラフ（charts_flutter など）で推移表示
+      body: FutureBuilder<Map<String, List<Workout>>>(
+        future: _todaysWorkouts, 
+        builder: (context, snapshot) {
+          final isLoading = snapshot.connectionState == ConnectionState.waiting;
+          final hasError = snapshot.hasError;
+          final workoutMap = snapshot.data ?? {};
+          final entries = workoutMap.entries.toList();
+
+          return Column(
+            children: [
+              SizedBox(
+                height: 392, 
+                child: TableCalendar(
+                  firstDay: DateTime.utc(2025, 1, 1),
+                  lastDay: DateTime.utc(2100, 12, 31),
+                  focusedDay: selectedDay,
+                  selectedDayPredicate: (day) => isSameDay(selectedDay, day),
+                  onDaySelected: (selectedDayNew, focusedDay) {
+                    context.read<SelectedDayNotifier>().setDay(selectedDayNew);
+                    _fetchWorkoutsForDay(selectedDayNew);
+                  },
+                  eventLoader: _getEventsForDay, // 🎯 軽量化されたローダー
+                  calendarStyle: CalendarStyle(
+                    selectedDecoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.blue, width: 2),),
+                    selectedTextStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold,),
+                    // 🎯 マーカーのスタイル設定
+                    markerDecoration: BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ), 
+              Expanded(child: Builder(builder: (_) {
+                if (isLoading) return const Center(child: CircularProgressIndicator());
+                if (hasError) return Center(child: Text('Error: ${snapshot.error}'));
+                if (entries.isEmpty) return const Center(child: Text('記録はありません'));
+                
+                return ListView.builder(
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    final name = entry.key; // 種目名
+                    final sets = entry.value; // List<Workout>
+
+                    return Card(
+                      margin: const EdgeInsets.all(8),
+                      child: ListTile(
+                        title: Text(name),
+                        subtitle: Text(sets.map((w) => '${w.weight}kg x ${w.reps}reps x ${w.sets}sets').join('\n')),
+                        onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutDetailScreen(workoutName: name, selectedDay: selectedDay),),);
+                        },
+                      ),
+                    );
+                  },
+                );
+              })),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutScreen(selectedDay: selectedDay))).then((_) {
+                        _loadWorkoutDates(); // 追加後にマークを更新
+                      });
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Workout'),
+                  ),
+                ),
+              ),
+            ]
+          );
+        },
       ),
     );
   }
@@ -102,7 +218,8 @@ class HomeScreen extends StatelessWidget {
 
 // Add Workout Screen
 class AddWorkoutScreen extends StatelessWidget {
-  const AddWorkoutScreen({super.key});
+  final DateTime? selectedDay;
+  const AddWorkoutScreen({super.key, this.selectedDay});
 
   // Workout Data structure 
   final Map<String, List<String>> workoutCategories = const {
@@ -115,6 +232,8 @@ class AddWorkoutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final day = selectedDay ?? DateTime.now(); // デフォルト値を設定
+
     return Scaffold(
       appBar: AppBar(title: const Text('Add Workout')),
       body: ListView(
@@ -131,7 +250,7 @@ class AddWorkoutScreen extends StatelessWidget {
                 onTap: () {
                   // TODO: タップされたワークアウト名を AddWorkoutDetailScreen に渡して遷移する処理を書く
                   //       この先でSQLiteにデータをInsertする処理を書くことになる
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutDetailScreen(workoutName: workoutName)));
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutDetailScreen(workoutName: workoutName, selectedDay: day)));
                 },
               );
             }).toList(),
@@ -145,7 +264,8 @@ class AddWorkoutScreen extends StatelessWidget {
 // Add Workout Detail Screen
 class AddWorkoutDetailScreen extends StatelessWidget {
   final String workoutName; // TapされたworkoutNameを受け取る
-  const AddWorkoutDetailScreen({super.key, required this.workoutName});
+  final DateTime selectedDay; // Tapされた日付を受け取る
+  const AddWorkoutDetailScreen({super.key, required this.workoutName, required this.selectedDay});
 
   @override
   Widget build(BuildContext context) {
@@ -171,13 +291,24 @@ class AddWorkoutDetailScreen extends StatelessWidget {
             // Submit Button
             ElevatedButton(
               onPressed: () async {
+                final weight = double.tryParse(weightController.text);
+                final reps = int.tryParse(repsController.text);
+                final sets = int.tryParse(setsController.text);
+
+                if (weight == null || reps == null || sets == null) {
+                  // 入力が不正の場合はアラート表示などの処理を入れる
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('正しい数値を入力してください')),
+                  );
+                  return;
+                }
                 // TODO: 入力データをSQLiteに保存する処理を追加
                 final workout = WorkoutsCompanion(
                   name: drift.Value(workoutName),
-                  weight: drift.Value(int.parse(weightController.text)),
-                  reps: drift.Value(int.parse(repsController.text)),
-                  sets: drift.Value(int.parse(setsController.text)),
-                  date: drift.Value(DateTime.now()),
+                  weight: drift.Value(weight),
+                  reps: drift.Value(reps),
+                  sets: drift.Value(sets),
+                  date: drift.Value(selectedDay),
                 );
                 await db.insertWorkout(workout);
                 Navigator.pop(context); // 入力完了後に前の画面に戻る
