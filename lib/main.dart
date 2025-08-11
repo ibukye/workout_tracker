@@ -8,7 +8,19 @@ import 'package:provider/provider.dart';
 
 final db = AppDatabase();
 
-void main() {
+void main() async {
+  // 🎯 Flutter の初期化を確実に行う
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    // 🎯 データベースの初期化処理を実行
+    print('アプリケーション起動: データベース初期化開始');
+    await db.initializeApp();
+    print('データベース初期化完了');
+  } catch (e) {
+    print('データベース初期化でエラーが発生しましたが、アプリを続行します: $e');
+  }
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => SelectedDayNotifier(),
@@ -52,7 +64,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  DateTime _selectedDay = DateTime.now();
+  //DateTime _selectedDay = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
@@ -217,45 +229,159 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // Add Workout Screen
-class AddWorkoutScreen extends StatelessWidget {
+class AddWorkoutScreen extends StatefulWidget {
   final DateTime? selectedDay;
   const AddWorkoutScreen({super.key, this.selectedDay});
 
-  // Workout Data structure 
-  final Map<String, List<String>> workoutCategories = const {
-    'Abs': ['Crunch', 'Plank'],
-    'Leg': ['Squat', 'Leg Press'],
-    'Arm': ['Bicep Curl', 'Tricep Extension'],
-    'Shoulder': ['Overhead Press', 'Lateral Raise'],
-    'Back': ['Pull-up', 'Deadlift'],
-  };
+  @override
+  State<AddWorkoutScreen> createState() => _AddWorkoutScreenState();
+}
+
+class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
+  late Future<Map<Category, List<Exercise>>> _categoriesData;
+
+  @override
+  void initState() {
+    super.initState();
+    _categoriesData = db.getCategoriesWithExercises();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _categoriesData = db.getCategoriesWithExercises();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final day = selectedDay ?? DateTime.now(); // デフォルト値を設定
+    final day = widget.selectedDay ?? DateTime.now(); // デフォルト値を設定
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Workout')),
-      body: ListView(
-        children: workoutCategories.entries.map((entry) {
-          final category = entry.key;
-          final workouts = entry.value;
+      appBar: AppBar(title: const Text('Add Workout'), actions: [IconButton(icon: const Icon(Icons.add), onPressed: () => _showAddCategoryDialog(),),],),
+      body: FutureBuilder<Map<Category, List<Exercise>>>(
+        future: _categoriesData,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
 
-          return ExpansionTile(
-            title: Text(category, style: const TextStyle(fontWeight: FontWeight.bold)),
-            children: workouts.map((workoutName) {
-              return ListTile(
-                title: Text(workoutName),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  // TODO: タップされたワークアウト名を AddWorkoutDetailScreen に渡して遷移する処理を書く
-                  //       この先でSQLiteにデータをInsertする処理を書くことになる
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutDetailScreen(workoutName: workoutName, selectedDay: day)));
-                },
+          final categoriesData = snapshot.data ?? {};
+          if (categoriesData.isEmpty) {
+            return const Center(child: Text('カテゴリーが見つかりません'));
+          }
+
+          return ListView(
+            children: categoriesData.entries.map((entry) {
+              final category = entry.key;
+              final exercises = entry.value;
+
+              return ExpansionTile(
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        category.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline, size: 20),
+                      onPressed: () => _showAddExerciseDialog(category),
+                    ),
+                  ],
+                ),
+                children: exercises.map((exercise) {
+                  return ListTile(
+                    title: Text(exercise.name),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddWorkoutDetailScreen(
+                            workoutName: exercise.name,
+                            selectedDay: day,
+                          ),
+                        ),
+                      ).then((_) => _refreshData());
+                    },
+                  );
+                }).toList(),
               );
             }).toList(),
           );
-        }).toList(),
+        },
+      ),
+    );
+  }
+  void _showAddCategoryDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新しいカテゴリーを追加'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'カテゴリー名',
+            hintText: 'Chest, Core など',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                await db.insertCategory(name);
+                _refreshData();
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('追加'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddExerciseDialog(Category category) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${category.name}に新しいエクササイズを追加'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'エクササイズ名',
+            hintText: 'Push-up, Sit-up など',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                await db.insertExercise(name, category.id);
+                _refreshData();
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('追加'),
+          ),
+        ],
       ),
     );
   }
@@ -302,7 +428,7 @@ class AddWorkoutDetailScreen extends StatelessWidget {
                   );
                   return;
                 }
-                // TODO: 入力データをSQLiteに保存する処理を追加
+                // 入力データをSQLiteに保存する処理
                 final workout = WorkoutsCompanion(
                   name: drift.Value(workoutName),
                   weight: drift.Value(weight),
@@ -311,7 +437,9 @@ class AddWorkoutDetailScreen extends StatelessWidget {
                   date: drift.Value(selectedDay),
                 );
                 await db.insertWorkout(workout);
-                Navigator.pop(context); // 入力完了後に前の画面に戻る
+                //Navigator.pop(context); // 入力完了後に前の画面に戻る
+                //Navigator.push(context, MaterialPageRoute(builder: (_) => HomeScreen(),),);
+                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => MainScreen()),  (route) => false,);
               },
               child: const Text('Save'),
             ),
@@ -339,21 +467,14 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-// TODO: AddWorkoutScreen を作成
-// - 種目名を入力する TextField
-// - 重量・回数を入力する NumberField
-// - 保存ボタンを配置
-// - 保存後はホーム画面に戻る or データベースに保存
-
 // TODO: SettingsScreen を作成
 // - 単純に「設定画面です」と表示
 // - 将来的にテーマ切り替えやバックアップ設定を追加
 
-// =========================
-// ▼ Drift(SQLite) 実装予定位置
-// =========================
-// 1. Workoutsテーブル定義（name, weight, reps, sets, date）
-// 2. AppDatabaseクラス作成（insert, query, delete, update関数）
-// 3. main.dartでDatabaseインスタンスをグローバルまたはProvider経由で渡す
-// 4. AddWorkoutDetailScreenからinsertを呼ぶ
-// 5. HomeScreenでselectして表示
+
+
+
+// TODO: 通知と一週間のメニュー表
+
+
+// TODO: 例えばLegPressを押して項目を追加する画面に行った後に、戻るという操作をしたらAddWorkout画面ですべてのトグルが閉じている状態になるんですけど、一回開いたトグルの状態を保存することはできませんか
