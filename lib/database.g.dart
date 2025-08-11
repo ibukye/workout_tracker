@@ -32,11 +32,11 @@ class $WorkoutsTable extends Workouts with TableInfo<$WorkoutsTable, Workout> {
   );
   static const VerificationMeta _weightMeta = const VerificationMeta('weight');
   @override
-  late final GeneratedColumn<int> weight = GeneratedColumn<int>(
+  late final GeneratedColumn<double> weight = GeneratedColumn<double>(
     'weight',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _repsMeta = const VerificationMeta('reps');
@@ -141,7 +141,7 @@ class $WorkoutsTable extends Workouts with TableInfo<$WorkoutsTable, Workout> {
         data['${effectivePrefix}name'],
       )!,
       weight: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.double,
         data['${effectivePrefix}weight'],
       )!,
       reps: attachedDatabase.typeMapping.read(
@@ -168,7 +168,7 @@ class $WorkoutsTable extends Workouts with TableInfo<$WorkoutsTable, Workout> {
 class Workout extends DataClass implements Insertable<Workout> {
   final int id;
   final String name;
-  final int weight;
+  final double weight;
   final int reps;
   final int sets;
   final DateTime date;
@@ -185,7 +185,7 @@ class Workout extends DataClass implements Insertable<Workout> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['name'] = Variable<String>(name);
-    map['weight'] = Variable<int>(weight);
+    map['weight'] = Variable<double>(weight);
     map['reps'] = Variable<int>(reps);
     map['sets'] = Variable<int>(sets);
     map['date'] = Variable<DateTime>(date);
@@ -211,7 +211,7 @@ class Workout extends DataClass implements Insertable<Workout> {
     return Workout(
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      weight: serializer.fromJson<int>(json['weight']),
+      weight: serializer.fromJson<double>(json['weight']),
       reps: serializer.fromJson<int>(json['reps']),
       sets: serializer.fromJson<int>(json['sets']),
       date: serializer.fromJson<DateTime>(json['date']),
@@ -223,7 +223,7 @@ class Workout extends DataClass implements Insertable<Workout> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
-      'weight': serializer.toJson<int>(weight),
+      'weight': serializer.toJson<double>(weight),
       'reps': serializer.toJson<int>(reps),
       'sets': serializer.toJson<int>(sets),
       'date': serializer.toJson<DateTime>(date),
@@ -233,7 +233,7 @@ class Workout extends DataClass implements Insertable<Workout> {
   Workout copyWith({
     int? id,
     String? name,
-    int? weight,
+    double? weight,
     int? reps,
     int? sets,
     DateTime? date,
@@ -286,7 +286,7 @@ class Workout extends DataClass implements Insertable<Workout> {
 class WorkoutsCompanion extends UpdateCompanion<Workout> {
   final Value<int> id;
   final Value<String> name;
-  final Value<int> weight;
+  final Value<double> weight;
   final Value<int> reps;
   final Value<int> sets;
   final Value<DateTime> date;
@@ -301,7 +301,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
   WorkoutsCompanion.insert({
     this.id = const Value.absent(),
     required String name,
-    required int weight,
+    required double weight,
     required int reps,
     required int sets,
     required DateTime date,
@@ -313,7 +313,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
   static Insertable<Workout> custom({
     Expression<int>? id,
     Expression<String>? name,
-    Expression<int>? weight,
+    Expression<double>? weight,
     Expression<int>? reps,
     Expression<int>? sets,
     Expression<DateTime>? date,
@@ -331,7 +331,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
   WorkoutsCompanion copyWith({
     Value<int>? id,
     Value<String>? name,
-    Value<int>? weight,
+    Value<double>? weight,
     Value<int>? reps,
     Value<int>? sets,
     Value<DateTime>? date,
@@ -356,7 +356,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
       map['name'] = Variable<String>(name.value);
     }
     if (weight.present) {
-      map['weight'] = Variable<int>(weight.value);
+      map['weight'] = Variable<double>(weight.value);
     }
     if (reps.present) {
       map['reps'] = Variable<int>(reps.value);
@@ -399,7 +399,7 @@ typedef $$WorkoutsTableCreateCompanionBuilder =
     WorkoutsCompanion Function({
       Value<int> id,
       required String name,
-      required int weight,
+      required double weight,
       required int reps,
       required int sets,
       required DateTime date,
@@ -408,7 +408,7 @@ typedef $$WorkoutsTableUpdateCompanionBuilder =
     WorkoutsCompanion Function({
       Value<int> id,
       Value<String> name,
-      Value<int> weight,
+      Value<double> weight,
       Value<int> reps,
       Value<int> sets,
       Value<DateTime> date,
@@ -433,7 +433,7 @@ class $$WorkoutsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get weight => $composableBuilder(
+  ColumnFilters<double> get weight => $composableBuilder(
     column: $table.weight,
     builder: (column) => ColumnFilters(column),
   );
@@ -473,7 +473,7 @@ class $$WorkoutsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get weight => $composableBuilder(
+  ColumnOrderings<double> get weight => $composableBuilder(
     column: $table.weight,
     builder: (column) => ColumnOrderings(column),
   );
@@ -509,7 +509,7 @@ class $$WorkoutsTableAnnotationComposer
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
-  GeneratedColumn<int> get weight =>
+  GeneratedColumn<double> get weight =>
       $composableBuilder(column: $table.weight, builder: (column) => column);
 
   GeneratedColumn<int> get reps =>
@@ -552,7 +552,7 @@ class $$WorkoutsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-                Value<int> weight = const Value.absent(),
+                Value<double> weight = const Value.absent(),
                 Value<int> reps = const Value.absent(),
                 Value<int> sets = const Value.absent(),
                 Value<DateTime> date = const Value.absent(),
@@ -568,7 +568,7 @@ class $$WorkoutsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String name,
-                required int weight,
+                required double weight,
                 required int reps,
                 required int sets,
                 required DateTime date,
