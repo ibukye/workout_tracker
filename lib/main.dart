@@ -797,7 +797,7 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
     final reps = int.tryParse(_repsController.text);
     final sets = int.tryParse(_setsController.text);
 
-    if (weight == null || reps == null || sets == null) {
+    if (weight == null || reps == null || sets == null || reps == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('正しい数値を入力してください')),
       );
@@ -1330,7 +1330,7 @@ void showNotification() async {
 // TODO: 通知
 // TODO: 最後の履歴追加が終わってから30分後にはプロテインを飲むことを催促する通知を作成する
 
-// TODO: エクササイズの順序を並び替えたら毎回リフレッシュされるのをなくしたい -> チェックボタンをクリックしたらその順番を保存するみたいな感じ
+//  OK: エクササイズの順序を並び替えたら毎回リフレッシュされるのをなくしたい -> チェックボタンをクリックしたらその順番を保存するみたいな感じ
 
 // TODO: 例えばLegPressを押して項目を追加する画面に行った後に、戻るという操作をしたらAddWorkout画面ですべてのトグルが閉じている状態になるんですけど、一回開いたトグルの状態を保存することはできませんか
 
