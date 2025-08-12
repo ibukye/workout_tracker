@@ -219,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final selectedDay = context.watch<SelectedDayNotifier>().day;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('ホーム画面'), backgroundColor: Colors.blue.shade50, toolbarHeight: 48,),
+      appBar: AppBar(title: const Text('Home'), backgroundColor: Colors.blue.shade50, toolbarHeight: 45,),
       body: FutureBuilder<Map<String, List<Workout>>>(
         future: _todaysWorkouts, 
         builder: (context, snapshot) {
@@ -323,34 +323,76 @@ class AddWorkoutScreen extends StatefulWidget {
 }
 
 class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
-  late Future<Map<Category, List<Exercise>>> _categoriesData;
+  Map<Category, List<Exercise>> _categoriesData = {};
+  bool _isLoading = true;
   bool _isEditMode = false;
 
   @override
   void initState() {
     super.initState();
-    _categoriesData = db.getCategoriesWithExercises();
+    _loadData();
   }
 
-  void _refreshData() {
+  Future<void> _loadData() async {
     setState(() {
-      _categoriesData = db.getCategoriesWithExercises();
+      _isLoading = true;
+    });
+    final data = await db.getCategoriesWithExercises();
+    setState(() {
+      _categoriesData = data;
+      _isLoading = false;
     });
   }
 
-  void _toggleEditMode() {
-    setState(() { _isEditMode = !_isEditMode; });
+  void _refreshData() {
+    _loadData();
+  }
+
+  // ▼▼▼ 編集モード切り替えと保存のロジック ▼▼▼
+  void _toggleEditMode() async {
+    // 編集モードが終了するとき（true -> false）に保存処理を実行
+    if (_isEditMode) {
+      await _saveAllReorderedExercises();
+    }
+    setState(() {
+      _isEditMode = !_isEditMode;
+    });
+  }
+
+  // 保存処理をまとめた新しいメソッド
+  Future<void> _saveAllReorderedExercises() async {
+    try {
+      for (final entry in _categoriesData.entries) {
+        final categoryId = entry.key.id;
+        final exerciseIds = entry.value.map((e) => e.id).toList();
+        await db.reorderExercises(categoryId, exerciseIds);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('すべての順序を保存しました'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('順序の保存に失敗しました: $e')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final day = widget.selectedDay ?? DateTime.now(); // デフォルト値を設定
+    final day = widget.selectedDay ?? DateTime.now();
 
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditMode ? 'Edit Exercises' : 'Add Workout'),
         backgroundColor: Colors.blue.shade50,
-        toolbarHeight: 48,
+        toolbarHeight: 45,
         iconTheme: IconThemeData(color: Theme.of(context).colorScheme.onSurface),
         actions: [
           IconButton(
@@ -366,90 +408,76 @@ class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
             ),
         ],
       ),
-      //appBar: AppBar(title: const Text('Add Workout'), actions: [IconButton(icon: const Icon(Icons.add), onPressed: () => _showAddCategoryDialog(),),],),
-      body: FutureBuilder<Map<Category, List<Exercise>>>(
-        future: _categoriesData,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _categoriesData.isEmpty
+              ? const Center(child: Text('カテゴリーが見つかりません'))
+              // ▼▼▼ ListViewの修正 ▼▼▼
+              : ListView(
+                  children: _categoriesData.entries.map((entry) {
+                    final category = entry.key;
+                    final exercises = entry.value;
 
-          final categoriesData = snapshot.data ?? {};
-          if (categoriesData.isEmpty) {
-            return const Center(child: Text('カテゴリーが見つかりません'));
-          }
-
-          return ListView(
-            children: categoriesData.entries.map((entry) {
-              final category = entry.key;
-              final exercises = entry.value;
-
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: ExpansionTile(
-                  leading: CircleAvatar(
-                    backgroundColor: _getCategoryColor(category.name),
-                    child: Icon(
-                      _getCategoryIcon(category.name),
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  title: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          category.name,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: ExpansionTile(
+                        leading: CircleAvatar(
+                          backgroundColor: _getCategoryColor(category.name),
+                          child: Icon(
+                            _getCategoryIcon(category.name),
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
-                      ),
-                      if (_isEditMode)
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          color: Colors.red,
-                          onPressed: () => _confirmDeleteCategory(category),
-                        ),
-                      if (!_isEditMode)
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline, size: 18),
-                          onPressed: () => _showAddExerciseDialog(category),
-                        ),
-                    ],
-                  ),
-                  children: _isEditMode
-                      ? [_buildEditableExerciseList(category, exercises)]
-                      : exercises.map((exercise) {
-                          return ListTile(
-                            leading: Icon(
-                              Icons.fitness_center,
-                              color: _getCategoryColor(category.name),
-                              size: 20,
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                category.name,
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              ),
                             ),
-                            title: Text(exercise.name),
-                            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AddWorkoutDetailScreen(
-                                    workoutName: exercise.name,
-                                    selectedDay: day,
+                            if (_isEditMode)
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 18),
+                                color: Colors.red,
+                                onPressed: () => _confirmDeleteCategory(category),
+                              ),
+                            if (!_isEditMode)
+                              IconButton(
+                                icon: const Icon(Icons.add_circle_outline, size: 18),
+                                onPressed: () => _showAddExerciseDialog(category),
+                              ),
+                          ],
+                        ),
+                        children: _isEditMode
+                            ? [_buildEditableExerciseList(category, exercises)]
+                            : exercises.map((exercise) {
+                                return ListTile(
+                                  leading: Icon(
+                                    Icons.fitness_center,
+                                    color: _getCategoryColor(category.name),
+                                    size: 20,
                                   ),
-                                ),
-                              ).then((_) => _refreshData());
-                            },
-                          );
-                        }).toList(),
-                  ),
-                );
-            }).toList(),
-          );
-        },
-      ),
+                                  title: Text(exercise.name),
+                                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => AddWorkoutDetailScreen(
+                                          workoutName: exercise.name,
+                                          selectedDay: day,
+                                        ),
+                                      ),
+                                    ).then((_) => _refreshData());
+                                  },
+                                );
+                              }).toList(),
+                      ),
+                    );
+                  }).toList(),
+                ),
     );
   }
 
@@ -458,34 +486,16 @@ class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: exercises.length,
-      onReorder: (int oldIndex, int newIndex) async {
-        if (oldIndex < newIndex) {
-          newIndex -= 1;
-        }
-        
-        // 並び替え処理を実装
-        final List<Exercise> reorderedExercises = List.from(exercises);
-        final Exercise movedExercise = reorderedExercises.removeAt(oldIndex);
-        reorderedExercises.insert(newIndex, movedExercise);
-        
-        // データベースの順序を更新
-        final exerciseIds = reorderedExercises.map((e) => e.id).toList();
-        
-        try {
-          await db.reorderExercises(category.id, exerciseIds);
-          _refreshData(); // データを再取得して画面を更新
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('並び替えを保存しました'),
-              duration: Duration(seconds: 1),
-            ),
-          );
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('並び替えの保存に失敗しました: $e')),
-          );
-        }
+      // ▼▼▼ onReorderの修正 ▼▼▼
+      onReorder: (int oldIndex, int newIndex) {
+        setState(() {
+          if (oldIndex < newIndex) {
+            newIndex -= 1;
+          }
+          final Exercise movedExercise = exercises.removeAt(oldIndex);
+          exercises.insert(newIndex, movedExercise);
+          // データベースへの保存はここでは行わない
+        });
       },
       itemBuilder: (context, index) {
         final exercise = exercises[index];
@@ -904,7 +914,7 @@ class _RoutineScreenState extends State<RoutineScreen> {
       appBar: AppBar(
         title: const Text('Weekly Routine'),
         backgroundColor: Colors.blue.shade50,
-        toolbarHeight: 48,
+        toolbarHeight: 45,
       ),
       body: FutureBuilder<Map<int, List<String>>>(
         future: _weeklyRoutines, 
@@ -1255,7 +1265,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Setting'), backgroundColor: Colors.blue.shade50, toolbarHeight: 48,),
+      appBar: AppBar(title: const Text('Setting'), backgroundColor: Colors.blue.shade50, toolbarHeight: 45,),
       body: const Center(
         child: Text('ここに設定項目を追加'),
         // TODO: テーマ切り替えスイッチ
