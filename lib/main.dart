@@ -339,6 +339,9 @@ class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
   bool _isLoading = true;
   bool _isEditMode = false;
 
+  // ▼▼▼ 状態を保持するマップを追加 ▼▼▼
+  final Map<int, bool> _expansionState = {};
+
   @override
   void initState() {
     super.initState();
@@ -434,6 +437,13 @@ class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: ExpansionTile(
+                        key: PageStorageKey('category_${category.id}'), // 一意のキー
+                        initiallyExpanded: _expansionState[category.id] ?? false,
+                        onExpansionChanged: (expanded) {
+                          setState(() {
+                            _expansionState[category.id] = expanded;
+                          });
+                        },
                         leading: CircleAvatar(
                           backgroundColor: _getCategoryColor(category.name),
                           child: Icon(
@@ -812,6 +822,14 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
       date: drift.Value(widget.selectedDay),
     );
     await db.insertWorkout(workout);
+
+    // 以前の通知があればキャンセルし、新しい通知を30分後にスケジュールする
+    await flutterLocalNotificationsPlugin.cancel(999); // 通知IDを固定してキャンセル
+    await scheduleNotification(
+      id: 999, // プロテイン通知専用のID
+      minutesLater: 1, // 30分後
+      message: 'トレーニングお疲れ様でした！プロテインを摂取しましょう💪',
+    );
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => MainScreen()), (route) => false,);
