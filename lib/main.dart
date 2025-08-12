@@ -5,6 +5,10 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+//import 'package:flutter_native_timezone/flutter_native_timezone.dart';
+//import 'package:flutter_timezone/flutter_timezone.dart';
+
+
 
 // ↓ SQLite(Drift)を使う場合に必要なインポート（後で追加）
 import 'package:drift/drift.dart' as drift;
@@ -24,53 +28,66 @@ Future<void> requestNotificationPermission() async {
   }
 }
 
-void setupTimezone() {
-  tz.initializeTimeZones();
-  tz.setLocalLocation(tz.getLocation('Asia/Tokyo'));
+Future<void> createNotificationChannel() async {
+  const channel = AndroidNotificationChannel(
+    'workout_channel',
+    'Workout Notifications',
+    description: '通知の説明',
+    importance: Importance.high,
+  );
+
+  final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+  if (androidPlugin != null) {
+    await androidPlugin.createNotificationChannel(channel);
+  }
 }
 
-Future<void> scheduleNotification(int minutesLater, String message) async {
-  final scheduledTime = DateTime.now().add(Duration(minutes: minutesLater));
+Future<void> scheduleNotification({required int id, required int minutesLater, required String message}) async {
 
   await flutterLocalNotificationsPlugin.zonedSchedule(
-    minutesLater, 
+    id,
     'Protein Reminder',
-    message, 
-    tz.TZDateTime.from(scheduledTime, tz.local),
-    const NotificationDetails(
-      android: AndroidNotificationDetails(
-        'reminder_channel', 
-        'reminder',
-        importance: Importance.high,
-        priority: Priority.high,
+    message,
+    tz.TZDateTime.now(tz.local).add(Duration(minutes: minutesLater)),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'workout_channel', 
+          'Workout Notifications',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
       ),
-    ),
     androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-
-    matchDateTimeComponents: null,
   );
 }
 
 void main() async {
-  // 🎯 Flutter の初期化を確実に行う
   WidgetsFlutterBinding.ensureInitialized();
 
-  await requestNotificationPermission();  // ← これを追加
-  
-  try {
-    // 🎯 データベースの初期化処理を実行
-    print('アプリケーション起動: データベース初期化開始');
-    await db.initializeApp();
-    print('データベース初期化完了');
-  } catch (e) {
-    print('データベース初期化でエラーが発生しましたが、アプリを続行します: $e');
+  await requestNotificationPermission();
+  await createNotificationChannel();
+
+  // このまま
+  tz.initializeTimeZones();
+  tz.setLocalLocation(tz.getLocation('Asia/Tokyo'));
+
+  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const iosInit = DarwinInitializationSettings(
+    requestAlertPermission: true,
+    requestBadgePermission: true,
+    requestSoundPermission: true,
+  );
+
+  // Androidのプラグインインスタンスを取得
+  final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+  if (androidPlugin != null) {
+    // 正確なアラームの権限をリクエストする
+    await androidPlugin.requestExactAlarmsPermission();
   }
 
-  const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const InitializationSettings initSettings =  InitializationSettings(android: androidSettings);
-
-  await flutterLocalNotificationsPlugin.initialize(initSettings);
+  await flutterLocalNotificationsPlugin.initialize(
+    const InitializationSettings(android: androidInit, iOS: iosInit),
+  );
 
   runApp(
     ChangeNotifierProvider(
@@ -79,6 +96,7 @@ void main() async {
     ),
   );
 }
+
 
 class SelectedDayNotifier extends ChangeNotifier {
   DateTime _day = DateTime.now();
@@ -212,16 +230,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
           return Column(
             children: [
+              // TODO: Notification 実装
+              /*
               ElevatedButton(child: const Text('notification'), onPressed: showNotification,),
               ElevatedButton(
                 onPressed: () {
-                  scheduleNotification(0, 'done');
-                  scheduleNotification(10, '10 min later');
+                  scheduleNotification(id: 1, minutesLater: 1, message: 'done');
+                  scheduleNotification(id: 2, minutesLater: 10, message: '10 min later');
                 },
                 child: Text('Training Finished'),
-              ),
+              ),*/
               SizedBox(
-                height: 300, 
+                height: 350, 
                 child: TableCalendar(
                   firstDay: DateTime.utc(2025, 1, 1),
                   lastDay: DateTime.utc(2100, 12, 31),
@@ -1209,10 +1229,10 @@ void showNotification() async {
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
     'workout_channel', // チャンネルID
     'Workout Notifications',
-    channelDescription: '通知の説明',  // ここを明示的に追加
+    channelDescription: '通知の説明',
     importance: Importance.high,
     priority: Priority.high,
-    icon: '@mipmap/ic_launcher',        // アイコンの指定（適宜）
+    icon: '@mipmap/ic_launcher',
   );
 
   const NotificationDetails notificationDetails = NotificationDetails(
@@ -1237,3 +1257,7 @@ void showNotification() async {
 // TODO: エクササイズの順序を並び替えたら毎回リフレッシュされるのをなくしたい -> チェックボタンをクリックしたらその順番を保存するみたいな感じ
 
 // TODO: 例えばLegPressを押して項目を追加する画面に行った後に、戻るという操作をしたらAddWorkout画面ですべてのトグルが閉じている状態になるんですけど、一回開いたトグルの状態を保存することはできませんか
+
+// TODO: 今日のトレーニング履歴で間違ったところを消せるようにしたい
+
+// TODO: AddWorkoutScreenに今日のトレーニングを追加？
