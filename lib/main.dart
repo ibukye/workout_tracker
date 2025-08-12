@@ -1,4 +1,11 @@
 import 'package:flutter/material.dart';
+
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+
 // ↓ SQLite(Drift)を使う場合に必要なインポート（後で追加）
 import 'package:drift/drift.dart' as drift;
 
@@ -8,9 +15,48 @@ import 'package:provider/provider.dart';
 
 final db = AppDatabase();
 
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+Future<void> requestNotificationPermission() async {
+  final status = await Permission.notification.status;
+  if (!status.isGranted) {
+    await Permission.notification.request();
+  }
+}
+
+void setupTimezone() {
+  tz.initializeTimeZones();
+  tz.setLocalLocation(tz.getLocation('Asia/Tokyo'));
+}
+
+Future<void> scheduleNotification(int minutesLater, String message) async {
+  final scheduledTime = DateTime.now().add(Duration(minutes: minutesLater));
+
+  await flutterLocalNotificationsPlugin.zonedSchedule(
+    minutesLater, 
+    'Protein Reminder',
+    message, 
+    tz.TZDateTime.from(scheduledTime, tz.local),
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'reminder_channel', 
+        'reminder',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+    ),
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+
+    matchDateTimeComponents: null,
+  );
+}
+
 void main() async {
   // 🎯 Flutter の初期化を確実に行う
   WidgetsFlutterBinding.ensureInitialized();
+
+  await requestNotificationPermission();  // ← これを追加
   
   try {
     // 🎯 データベースの初期化処理を実行
@@ -20,6 +66,11 @@ void main() async {
   } catch (e) {
     print('データベース初期化でエラーが発生しましたが、アプリを続行します: $e');
   }
+
+  const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const InitializationSettings initSettings =  InitializationSettings(android: androidSettings);
+
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
 
   runApp(
     ChangeNotifierProvider(
@@ -161,6 +212,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
           return Column(
             children: [
+              ElevatedButton(child: const Text('notification'), onPressed: showNotification,),
+              ElevatedButton(
+                onPressed: () {
+                  scheduleNotification(0, 'done');
+                  scheduleNotification(10, '10 min later');
+                },
+                child: Text('Training Finished'),
+              ),
               SizedBox(
                 height: 300, 
                 child: TableCalendar(
@@ -1132,6 +1191,42 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
+
+// 通知
+void showNotification() async {
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'workout_channel', // チャンネルID
+    'Workout Notifications', // チャンネル名
+    description: '通知の説明',
+    importance: Importance.high,
+  );
+
+  final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+  if (androidPlugin != null) {
+    await androidPlugin.createNotificationChannel(channel);
+  }
+
+  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    'workout_channel', // チャンネルID
+    'Workout Notifications',
+    channelDescription: '通知の説明',  // ここを明示的に追加
+    importance: Importance.high,
+    priority: Priority.high,
+    icon: '@mipmap/ic_launcher',        // アイコンの指定（適宜）
+  );
+
+  const NotificationDetails notificationDetails = NotificationDetails(
+    android: androidDetails,
+  );
+
+  await flutterLocalNotificationsPlugin.show(
+    0,
+    'It\'s time to train!',
+    'Record your workout',
+    notificationDetails,
+  );
+}
+
 
 
 
