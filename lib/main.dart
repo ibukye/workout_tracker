@@ -133,20 +133,31 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  //DateTime _selectedDay = DateTime.now();
+
+  // ▼▼▼ pagesリストを State のメンバーにする (contextを使わないのでこれでOK) ▼▼▼
+  final List<Widget> _pages = [
+    const HomeScreen(),
+    const AddWorkoutScreen(), // 👈 selectedDayを渡すのをやめる
+    const RoutineScreen(),
+    const SettingsScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final selectedDay = context.watch<SelectedDayNotifier>().day;
-    final pages = [
+    //final selectedDay = context.watch<SelectedDayNotifier>().day;
+    /*final pages = [
       const HomeScreen(),                             // Home画面
       AddWorkoutScreen(selectedDay: selectedDay),     // ホーム画面のカレンダーで選択された日のトレーニング履歴に追加
       const RoutineScreen(),                          // 一週間のトレーニングメニューを作成できる＋通知機能つけたい
       const SettingsScreen(),                         // 
-    ];
+    ];*/
 
     return Scaffold(
-      body: pages[_selectedIndex],
+      // ▼▼▼ bodyをIndexedStackに変更 ▼▼▼
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.blue,
@@ -296,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutScreen(selectedDay: selectedDay))).then((_) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutScreen())).then((_) {
                         _loadWorkoutDates(); // 追加後にマークを更新
                       });
                     },
@@ -315,8 +326,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
 // Add Workout Screen
 class AddWorkoutScreen extends StatefulWidget {
-  final DateTime? selectedDay;
-  const AddWorkoutScreen({super.key, this.selectedDay});
+  //final DateTime? selectedDay;
+  //const AddWorkoutScreen({super.key, this.selectedDay});
+  const AddWorkoutScreen({super.key});
 
   @override
   State<AddWorkoutScreen> createState() => _AddWorkoutScreenState();
@@ -386,7 +398,8 @@ class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final day = widget.selectedDay ?? DateTime.now();
+    final day = context.watch<SelectedDayNotifier>().day;
+    //final day = widget.selectedDay ?? DateTime.now();
 
     return Scaffold(
       appBar: AppBar(
