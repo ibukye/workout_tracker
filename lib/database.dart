@@ -40,17 +40,26 @@ class Exercises extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
   IntColumn get categoryId => integer().references(Categories, #id)();
+  IntColumn get order => integer().withDefault(const Constant(0))(); // 表示順序
+}
+
+// 🎯 Routineテーブルを追加
+class Routines extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get dayOfWeek => integer()(); // 0=Monday, 1=Tuesday, ..., 6=Sunday
+  TextColumn get exerciseName => text()();
+  IntColumn get order => integer().withDefault(const Constant(0))(); // 表示順序
 }
 
 // ② データベースクラス定義
-@DriftDatabase(tables: [Workouts, Categories, Exercises])
+@DriftDatabase(tables: [Workouts, Categories, Exercises, Routines])
 class AppDatabase extends _$AppDatabase {
   // データベースファイルを開く処理を呼び出して初期化
   AppDatabase() : super(_openConnection());
 
   // スキーマバージョン（DBのバージョン管理用）
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   // 🎯 MigrationStrategyを追加
   @override
@@ -66,10 +75,30 @@ class AppDatabase extends _$AppDatabase {
         print('データベースをアップグレード中... from: $from, to: $to');
         if (from < 2) {
           // バージョン1からのアップグレード処理
+          await m.createTable(categories);
           await m.createTable(exercises);
-          // 既存データがない場合のみデフォルトデータを挿入
-          final existingCategories = await select(categories).get();
-          if (existingCategories.isEmpty) {
+          print('新しいテーブルを作成しました');
+        }
+        if (from < 3) {
+          // バージョン2からのアップグレード処理
+          await m.createTable(routines);
+          print('Routineテーブルを作成しました');
+        }
+        if (from < 4) {
+          // バージョン3からのアップグレード処理 - exercisesテーブルにorderカラムを追加
+          await m.addColumn(exercises, exercises.order);
+          print('Exercisesテーブルにorderカラムを追加しました');
+        }
+      },
+      beforeOpen: (details) async {
+        print('データベースオープン前処理...');
+        // マイグレーション後にデフォルトデータをチェック・挿入
+        if (details.wasCreated || details.hadUpgrade) {
+          print('データベースが作成またはアップグレードされたため、デフォルトデータをチェックします');
+          // ここでデフォルトデータの存在をチェックし、必要に応じて追加
+          final hasData = await _hasDefaultDataSafe();
+          if (!hasData) {
+            print('デフォルトデータが存在しないため、作成します...');
             await _insertDefaultData();
           }
         }
@@ -98,6 +127,32 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  // 🎯 安全なデフォルトデータチェック（テーブル存在確認付き）
+  Future<bool> _hasDefaultDataSafe() async {
+    try {
+      // テーブルが存在するかチェック
+      final result = await customSelect(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'",
+      ).getSingleOrNull();
+      
+      if (result == null) {
+        print('categoriesテーブルが存在しません');
+        return false;
+      }
+      
+      // テーブルが存在する場合、データの存在をチェック
+      final categoryCount = await (selectOnly(categories)
+        ..addColumns([categories.id.count()])).getSingle();
+      
+      final count = categoryCount.read(categories.id.count()) ?? 0;
+      print('カテゴリー数: $count');
+      return count > 0;
+    } catch (e) {
+      print('安全なデフォルトデータチェック中にエラー: $e');
+      return false;
+    }
+  }
+
   // 🎯 デフォルトの部位とトレーニング項目を追加
   Future<void> _insertDefaultData() async {
     print('デフォルトデータを作成中...');
@@ -121,6 +176,7 @@ class AppDatabase extends _$AppDatabase {
           final exerciseId = await into(this.exercises).insert(ExercisesCompanion.insert(
             name: exerciseName,
             categoryId: categoryId,
+            order: Value(exercises.indexOf(exerciseName)), // 順序を設定
           ));
           print('  エクササイズ "$exerciseName" を作成しました (ID: $exerciseId)');
         }
@@ -193,7 +249,8 @@ class AppDatabase extends _$AppDatabase {
 
       for (final cat in categoryList) {
         final exList = await (select(exercises)
-          ..where((e) => e.categoryId.equals(cat.id)))
+          ..where((e) => e.categoryId.equals(cat.id))
+          ..orderBy([(e) => OrderingTerm.asc(e.order)]))
           .get();
         result[cat] = exList;
       }
@@ -212,11 +269,149 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // --- エクササイズを追加 ---
-  Future<int> insertExercise(String name, int categoryId) {
+  Future<int> insertExercise(String name, int categoryId) async {
+    // 同じカテゴリーの最大order値を取得
+    final maxOrder = await (selectOnly(exercises)
+      ..addColumns([exercises.order.max()])
+      ..where(exercises.categoryId.equals(categoryId)))
+      .getSingleOrNull();
+    
+    final nextOrder = (maxOrder?.read(exercises.order.max()) ?? -1) + 1;
+    
     return into(exercises).insert(
-      ExercisesCompanion.insert(name: name, categoryId: categoryId),
+      ExercisesCompanion.insert(
+        name: name, 
+        categoryId: categoryId,
+        order: Value(nextOrder),
+      ),
     );
   }
+
+// エクササイズ名を更新
+  Future<int> updateExerciseName(int exerciseId, String newName) async {
+    return await (update(exercises)
+      ..where((e) => e.id.equals(exerciseId)))
+      .write(ExercisesCompanion(name: Value(newName)));
+  }
+
+// エクササイズを削除
+Future<int> deleteExercise(int exerciseId) async {
+  return await (delete(exercises)
+    ..where((e) => e.id.equals(exerciseId)))
+    .go();
+}
+
+// カテゴリーを削除（関連するエクササイズも削除）
+Future<void> deleteCategory(int categoryId) async {
+  try {
+    // 関連するエクササイズを先に削除
+    await (delete(exercises)
+      ..where((e) => e.categoryId.equals(categoryId)))
+      .go();
+    
+    // カテゴリーを削除
+    await (delete(categories)
+      ..where((c) => c.id.equals(categoryId)))
+      .go();
+  } catch (e) {
+    print('カテゴリー削除中にエラー: $e');
+    rethrow;
+  }
+}
+
+  // カテゴリー名を更新
+  Future<int> updateCategoryName(int categoryId, String newName) async {
+    return await (update(categories)
+      ..where((c) => c.id.equals(categoryId)))
+      .write(CategoriesCompanion(name: Value(newName)));
+  }
+
+  // 🎯 すべてのエクササイズ名を取得（Routine用）
+  Future<List<String>> getAllExerciseNames() async {
+    try {
+      final exerciseList = await select(exercises).get();
+      return exerciseList.map((e) => e.name).toList()..sort();
+    } catch (e) {
+      print('エクササイズ名取得中にエラー: $e');
+      return [];
+    }
+  }
+
+  // エクササイズの順序を更新
+  Future<void> reorderExercises(int categoryId, List<int> exerciseIds) async {
+    try {
+      // トランザクションを使用して一括更新
+      await transaction(() async {
+        for (int i = 0; i < exerciseIds.length; i++) {
+          await (update(exercises)
+            ..where((e) => e.id.equals(exerciseIds[i]) & e.categoryId.equals(categoryId)))
+            .write(ExercisesCompanion(order: Value(i)));
+        }
+      });
+      print('エクササイズの順序を更新しました');
+    } catch (e) {
+      print('エクササイズ順序更新中にエラー: $e');
+      rethrow;
+    }
+  }
+
+  // 🎯 Routine関連のメソッド
+  
+  // 曜日ごとのRoutineを取得
+  Future<Map<int, List<String>>> getWeeklyRoutines() async {
+    try {
+      final routineList = await (select(routines)
+        ..orderBy([(r) => OrderingTerm.asc(r.dayOfWeek), (r) => OrderingTerm.asc(r.order)]))
+        .get();
+      
+      final Map<int, List<String>> result = {};
+      
+      for (int i = 0; i < 7; i++) {
+        result[i] = [];
+      }
+      
+      for (final routine in routineList) {
+        result[routine.dayOfWeek]?.add(routine.exerciseName);
+      }
+      
+      return result;
+    } catch (e) {
+      print('週間ルーチン取得中にエラー: $e');
+      return {for (int i = 0; i < 7; i++) i: []};
+    }
+  }
+
+  // Routineに運動を追加
+  Future<int> addRoutine(int dayOfWeek, String exerciseName) async {
+    try {
+      // 同じ曜日の最大order値を取得
+      final maxOrder = await (selectOnly(routines)
+        ..addColumns([routines.order.max()])
+        ..where(routines.dayOfWeek.equals(dayOfWeek)))
+        .getSingleOrNull();
+      
+      final nextOrder = (maxOrder?.read(routines.order.max()) ?? -1) + 1;
+      
+      return await into(routines).insert(
+        RoutinesCompanion.insert(
+          dayOfWeek: dayOfWeek,
+          exerciseName: exerciseName,
+          order: Value(nextOrder),              // ← Value<int>
+        ),
+      );
+    } catch (e) {
+      print('ルーチン追加中にエラー: $e');
+      rethrow;
+    }
+  }
+
+  // Routineから運動を削除
+  Future<int> removeRoutine(int dayOfWeek, String exerciseName) async {
+    return await (delete(routines)
+      ..where((r) => r.dayOfWeek.equals(dayOfWeek) & r.exerciseName.equals(exerciseName)))
+      .go();
+  }
+
 
   // ③ 全ワークアウトデータを取得するメソッド
   Future<List<Workout>> getAllWorkouts() {
