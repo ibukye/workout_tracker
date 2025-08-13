@@ -118,8 +118,10 @@ class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
                     final exercises = entry.value;
 
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       child: ExpansionTile(
+                        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
+                        childrenPadding: const EdgeInsets.symmetric(horizontal: 16),
                         key: PageStorageKey('category_${category.id}'), // 一意のキー
                         initiallyExpanded: _expansionState[category.id] ?? false,
                         onExpansionChanged: (expanded) {
@@ -159,25 +161,28 @@ class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
                         children: _isEditMode
                             ? [_buildEditableExerciseList(category, exercises)]
                             : exercises.map((exercise) {
-                                return ListTile(
-                                  leading: Icon(
-                                    Icons.fitness_center,
-                                    color: _getCategoryColor(category.name),
-                                    size: 20,
-                                  ),
-                                  title: Text(exercise.name),
-                                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => AddWorkoutDetailScreen(
-                                          workoutName: exercise.name,
-                                          selectedDay: day,
-                                        ),
-                                      ),
-                                    ).then((_) => _refreshData());
-                                  },
+                                return Column(
+                                  children: [
+                                    ListTile(
+                                      title: Text(exercise.name, style: const TextStyle(fontSize: 16)), // ←フォントサイズも調整可
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0), // ←縦の余白を調整
+                                      minVerticalPadding: 0, // ←Flutter 3.0以降で有効
+                                      leading: Icon(Icons.fitness_center, color: _getCategoryColor(category.name), size: 20),
+                                      trailing: const Icon(Icons.arrow_forward_ios, size: 15),
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => AddWorkoutDetailScreen(
+                                              workoutName: exercise.name,
+                                              selectedDay: day,
+                                            ),
+                                          ),
+                                        ).then((_) => _refreshData());
+                                      },
+                                    ),
+                                    const Divider(height: 1, thickness: 0.5), // ← 線を追加
+                                  ]
                                 );
                               }).toList(),
                       ),
