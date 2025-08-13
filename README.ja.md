@@ -1,4 +1,4 @@
-# Workout Tracker
+# AtlasLog (Workout Tracker)
 
 📖 Read this in [English](README.md)
 
