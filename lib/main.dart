@@ -49,7 +49,6 @@ void main() async {
   );
 }
 
-
 // SelectedDayNotifierはmain.dartに残しても良い
 class SelectedDayNotifier extends ChangeNotifier {
   DateTime _day = DateTime.now();
@@ -76,8 +75,6 @@ class WorkoutTrackerApp extends StatelessWidget {
     );
   }
 }
-
-
 
 Future<void> requestNotificationPermission() async {
   final status = await Permission.notification.status;
@@ -119,17 +116,6 @@ Future<void> scheduleNotification({required int id, required int minutesLater, r
   );
 }
 
-
-
-
-
-
-
-
-
-
-
-
 // 通知
 void showNotification() async {
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -166,30 +152,23 @@ void showNotification() async {
 }
 
 
-
-
-
 // TODO: 通知
 // TODO: 最後の履歴追加が終わってから30分後にはプロテインを飲むことを催促する通知を作成する
-
-// OK: エクササイズの順序を並び替えたら毎回リフレッシュされるのをなくしたい -> チェックボタンをクリックしたらその順番を保存するみたいな感じ
-
-// OK: 例えばLegPressを押して項目を追加する画面に行った後に、戻るという操作をしたらAddWorkout画面ですべてのトグルが閉じている状態になるんですけど、一回開いたトグルの状態を保存することはできませんか
 
 // TODO: 今日のトレーニング履歴で間違ったところを消せるようにしたい
 
 // TODO: AddWorkoutScreenに今日のトレーニングを追加？
-
 
 // TODO: 初期値: Weightとrepsの入力欄に、前回同じ種目で記録した数値を薄くヒント表示（hintText）すると親切です。
 
 // TODO: 統計・グラフ機能
 /*
 トレーニングの成果を可視化する機能は、ユーザーのモチベーションを大いに高めます。
-
 種目ごとのMAX重量推移グラフ: fl_chartのようなライブラリを使い、種目ごとの最大重量の変遷を折れ線グラフで表示します。
-
 部位ごとのトレーニング量: 月ごとに、どの部位をどれくらいの量（セット数やボリューム）こなしたかを円グラフや棒グラフで表示します。
-
 新しいタブ（例：「Stats」）を追加して、これらのグラフをまとめて表示するのが良いでしょう。
 */
+
+// OK: エクササイズの順序を並び替えたら毎回リフレッシュされるのをなくしたい -> チェックボタンをクリックしたらその順番を保存するみたいな感じ
+
+// OK: 例えばLegPressを押して項目を追加する画面に行った後に、戻るという操作をしたらAddWorkout画面ですべてのトグルが閉じている状態になるんですけど、一回開いたトグルの状態を保存することはできませんか
