@@ -137,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.all(12.0),
                 child: SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
+                  /*child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutScreen())).then((_) {
                         _loadWorkoutDates(); // 追加後にマークを更新
@@ -145,13 +145,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                     icon: const Icon(Icons.add),
                     label: const Text('Add Workout'),
-                  ),
+                  ),*/
                 ),
               ),
             ]
           );
-        },
+        }
       ),
+      floatingActionButton: FloatingActionButton(
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutScreen()))
+                      .then((_) {_loadWorkoutDates();});},
+                    child: const Icon(Icons.add),
+      )
     );
   }
 }
