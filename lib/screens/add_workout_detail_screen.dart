@@ -36,6 +36,31 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
   void initState() {
     super.initState();
     _loadInitialData(); // 初期データをロードするメソッドを呼び出す
+
+    // WeightのTextFieldがフォーカスされたときの処理
+    _weightFocusNode.addListener(() {
+      if (_weightFocusNode.hasFocus) {
+        // フォーカスが当たった直後にテキストを全選択する
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _weightController.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: _weightController.text.length,
+          );
+        });
+      }
+    });
+
+    // RepsのTextFieldがフォーカスされたときの処理
+    _repsFocusNode.addListener(() {
+      if (_repsFocusNode.hasFocus) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _repsController.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: _repsController.text.length,
+          );
+        });
+      }
+    });
   }
 
   @override
@@ -44,6 +69,10 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
     _weightController.dispose();
     _repsController.dispose();
     _setsController.dispose();
+
+    // FocusNodeからリスナーを削除
+    _weightFocusNode.removeListener(() {});
+    _repsFocusNode.removeListener(() {});
 
     _weightFocusNode.dispose();
     _repsFocusNode.dispose();
@@ -111,34 +140,36 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.workoutName)), // 👈 widget.を付けてアクセス
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // 履歴表示エリア
-            _buildHistorySection(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator()) // trueならインジケーターを表示
+          : Padding(             
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  // 履歴表示エリア
+                  _buildHistorySection(),
 
-            // 中央配置のキー
-            const Spacer(),
-            
-            // 入力フォーム
-            _buildInputForm(),
-            
-            // 中央配置のキー
-            const Spacer(),
-            
-            // 下部: 保存ボタン
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saveWorkout,
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                child: const Text('Save', style: TextStyle(fontSize: 16)),
+                  // 中央配置のキー
+                  const Spacer(),
+                  
+                  // 入力フォーム
+                  _buildInputForm(),
+                  
+                  // 中央配置のキー
+                  const Spacer(),
+                  
+                  // 下部: 保存ボタン
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _saveWorkout,
+                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      child: const Text('Save', style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
   // Layout
