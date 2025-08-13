@@ -157,6 +157,8 @@ void showNotification() async {
 
 // TODO: 今日のトレーニング履歴で間違ったところを消せるようにしたい
 
+// TODO: 広告は三分間とか
+
 // TODO: AddWorkoutScreenに今日のトレーニングを追加？
 
 // TODO: 初期値: Weightとrepsの入力欄に、前回同じ種目で記録した数値を薄くヒント表示（hintText）すると親切です。
