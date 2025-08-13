@@ -66,39 +66,29 @@ class AppDatabase extends _$AppDatabase {
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
-        print('データベースを初回作成中...');
+        // 初めてDBが作られるときに全てのテーブルを作成
         await m.createAll();
-        // 初回作成時にデフォルトデータを挿入
-        await _insertDefaultData();
       },
       onUpgrade: (Migrator m, int from, int to) async {
-        print('データベースをアップグレード中... from: $from, to: $to');
+        // バージョンアップ時に必要なテーブルやカラムを追加
         if (from < 2) {
-          // バージョン1からのアップグレード処理
           await m.createTable(categories);
           await m.createTable(exercises);
-          print('新しいテーブルを作成しました');
         }
         if (from < 3) {
-          // バージョン2からのアップグレード処理
           await m.createTable(routines);
-          print('Routineテーブルを作成しました');
         }
         if (from < 4) {
-          // バージョン3からのアップグレード処理 - exercisesテーブルにorderカラムを追加
           await m.addColumn(exercises, exercises.order);
-          print('Exercisesテーブルにorderカラムを追加しました');
         }
       },
       beforeOpen: (details) async {
-        print('データベースオープン前処理...');
-        // マイグレーション後にデフォルトデータをチェック・挿入
+        // DBが開かれる直前に毎回呼ばれる
+        // もしDBが新規作成されたか、アップグレードされた場合
         if (details.wasCreated || details.hadUpgrade) {
-          print('データベースが作成またはアップグレードされたため、デフォルトデータをチェックします');
-          // ここでデフォルトデータの存在をチェックし、必要に応じて追加
-          final hasData = await _hasDefaultDataSafe();
+          // デフォルトデータが存在しないことを確認してから挿入
+          final hasData = await (select(categories).get().then((l) => l.isNotEmpty));
           if (!hasData) {
-            print('デフォルトデータが存在しないため、作成します...');
             await _insertDefaultData();
           }
         }
