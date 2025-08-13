@@ -158,6 +158,8 @@ void showNotification() async {
 // TODO: 今日のトレーニング履歴で間違ったところを消せるようにしたい
 
 // TODO: 広告は三分間とか
+// TODO: リワード広告でデータバックアップ?
+// TODO: インタースティシャル広告
 
 // TODO: AddWorkoutScreenに今日のトレーニングを追加？
 
