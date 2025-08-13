@@ -96,53 +96,6 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  // 🎯 アプリ起動時の初期化処理（明示的にチェック）
-  Future<void> initializeApp() async {
-    try {
-      print('アプリ初期化開始...');
-      
-      // デフォルトデータが存在するかチェック
-      final hasData = await hasDefaultData();
-      print('デフォルトデータ存在チェック: $hasData');
-      
-      if (!hasData) {
-        print('デフォルトデータが存在しないため、作成します...');
-        await _insertDefaultData();
-      } else {
-        print('デフォルトデータは既に存在します');
-      }
-    } catch (e) {
-      print('アプリ初期化中にエラーが発生: $e');
-      // エラーが発生してもアプリが止まらないようにする
-    }
-  }
-
-  // 🎯 安全なデフォルトデータチェック（テーブル存在確認付き）
-  Future<bool> _hasDefaultDataSafe() async {
-    try {
-      // テーブルが存在するかチェック
-      final result = await customSelect(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'",
-      ).getSingleOrNull();
-      
-      if (result == null) {
-        print('categoriesテーブルが存在しません');
-        return false;
-      }
-      
-      // テーブルが存在する場合、データの存在をチェック
-      final categoryCount = await (selectOnly(categories)
-        ..addColumns([categories.id.count()])).getSingle();
-      
-      final count = categoryCount.read(categories.id.count()) ?? 0;
-      print('カテゴリー数: $count');
-      return count > 0;
-    } catch (e) {
-      print('安全なデフォルトデータチェック中にエラー: $e');
-      return false;
-    }
-  }
-
   // 🎯 デフォルトの部位とトレーニング項目を追加
   Future<void> _insertDefaultData() async {
     print('デフォルトデータを作成中...');
@@ -234,18 +187,27 @@ class AppDatabase extends _$AppDatabase {
   // --- カテゴリー一覧とエクササイズ一覧を取得 ---
   Future<Map<Category, List<Exercise>>> getCategoriesWithExercises() async {
     try {
+      // 1. 全てのカテゴリーを1回のクエリで取得
       final categoryList = await select(categories).get();
-      final Map<Category, List<Exercise>> result = {};
+      // 2. 全てのエクササイズを1回のクエリで取得
+      final exerciseList = await select(exercises).get();
 
+      // Dart側でエクササイズをcategoryIdごとにグループ化する
+      final Map<int, List<Exercise>> exercisesByCategoryId = {};
+      for (final exercise in exerciseList) {
+        (exercisesByCategoryId[exercise.categoryId] ??= []).add(exercise);
+      }
+
+      // カテゴリーにエクササイズを紐付ける
+      final Map<Category, List<Exercise>> result = {};
       for (final cat in categoryList) {
-        final exList = await (select(exercises)
-          ..where((e) => e.categoryId.equals(cat.id))
-          ..orderBy([(e) => OrderingTerm.asc(e.order)]))
-          .get();
-        result[cat] = exList;
+        // 順序でソートしながら紐付け
+        final exercisesForCategory = exercisesByCategoryId[cat.id] ?? [];
+        exercisesForCategory.sort((a, b) => a.order.compareTo(b.order));
+        result[cat] = exercisesForCategory;
       }
       
-      print('カテゴリー取得完了: ${result.length} カテゴリー');
+      print('カテゴリー取得完了: ${result.length} カテゴリー (効率化版)');
       return result;
     } catch (e) {
       print('カテゴリー取得中にエラー: $e');
@@ -412,15 +374,16 @@ Future<void> deleteCategory(int categoryId) async {
         .get();
   }
 
-  // ワークアウトがある日付のみを取得（null安全）
+  // ワークアウトがある日付のみを取得（効率化版）
   Future<Set<DateTime>> getWorkoutDates() async {
     try {
-      // まずはシンプルにすべてのワークアウトの日付を取得
-      final allWorkouts = await select(workouts).get();
+      // workoutsテーブルからdateカラムだけを重複なく取得
+      final query = selectOnly(workouts, distinct: true)..addColumns([workouts.date]);
+      final results = await query.get();
       
-      // 日付のみを抽出してSetに変換
-      final dates = allWorkouts.map((workout) {
-        final date = workout.date;
+      // 日付部分（年/月/日）のみを抽出してSetに変換
+      final dates = results.map((row) {
+        final date = row.read(workouts.date)!;
         return DateTime(date.year, date.month, date.day);
       }).toSet();
       
