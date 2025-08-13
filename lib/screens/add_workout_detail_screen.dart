@@ -145,15 +145,13 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.workoutName)), // 👈 widget.を付けてアクセス
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator()) // trueならインジケーターを表示
-          : Padding(             
+      body: Padding(             
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
                   // 履歴表示エリアをFlexibleでラップ
                   Flexible(
-                    flex: 1, // スペースの配分（デフォルトは1）
+                    flex: 2, // スペースの配分（デフォルトは1）
                     child: _buildHistorySection(),
                   ),
 
@@ -193,25 +191,41 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text("Today's History", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                if (_maxWeight != null) 
+                if (_todaysHistory.isNotEmpty)
                   Chip(
-                    label: Text('MAX: ${_maxWeight}kg', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    backgroundColor: Colors.amber.shade100,
-                    side: BorderSide.none, 
+                    label: Text('Total Sets: ${_todaysHistory.length}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    backgroundColor: Colors.blue.shade100,
+                    side: BorderSide.none,
                   ),
               ],
             ),
+            // MAX重量のChipは合計セット数の下へ移動（デザインの好みで調整）
+            if (_maxWeight != null && _maxWeight! > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Chip(
+                  label: Text('MAX: ${_maxWeight}kg', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  backgroundColor: Colors.amber.shade100,
+                  side: BorderSide.none,
+                ),
+              ),
+            
             // 空白
             const SizedBox(height: 8),
+            
+            // 履歴表示
             _todaysHistory.isEmpty
               ? const Text('No records for today yet.', style: TextStyle(color: Colors.grey))
               : Column(
-                children: _todaysHistory.map((workout) {
+                children: _todaysHistory.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final workout = entry.value;
+
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     title: Text(
-                      'Set ${workout.sets}: ${workout.weight} kg x ${workout.reps} reps',
+                      'Set ${index+1}: ${workout.weight} kg x ${workout.reps} reps',
                       style: const TextStyle(fontSize: 16),
                     ),
                   );
