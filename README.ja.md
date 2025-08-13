@@ -1,6 +1,6 @@
 # Workout Tracker
 
-📖 Read this in [English](README.en.md)
+📖 Read this in [English](README.md)
 
 日々のトレーニングを手軽に記録し、成長を可視化するためのシンプルな筋力トレーニング記録アプリです。Flutterを使用して開発されており、iOSとAndroidの両方で動作します。
 
