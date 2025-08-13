@@ -27,6 +27,9 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
   final _repsFocusNode = FocusNode();
   final _setsFocusNode = FocusNode();
 
+  // スクロールバーcontroller
+  final _scrollController = ScrollController();
+
   // 履歴とMAX重量を保持するState変数
   List<Workout> _todaysHistory = [];
   double? _maxWeight;
@@ -77,6 +80,8 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
     _weightFocusNode.dispose();
     _repsFocusNode.dispose();
     _setsFocusNode.dispose();
+
+     _scrollController.dispose();
 
     super.dispose();
   }
@@ -146,12 +151,12 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  // 履歴表示エリア
-                  _buildHistorySection(),
+                  // 履歴表示エリアをFlexibleでラップ
+                  Flexible(
+                    flex: 1, // スペースの配分（デフォルトは1）
+                    child: _buildHistorySection(),
+                  ),
 
-                  // 中央配置のキー
-                  const Spacer(),
-                  
                   // 入力フォーム
                   _buildInputForm(),
                   
@@ -176,38 +181,45 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
 
   // 履歴表示
   Widget _buildHistorySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Today's History", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            if (_maxWeight != null) 
-              Chip(
-                label: Text('MAX: ${_maxWeight}kg', style: const TextStyle(fontWeight: FontWeight.bold)),
-                backgroundColor: Colors.amber.shade100,
-                side: BorderSide.none, 
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Today's History", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                if (_maxWeight != null) 
+                  Chip(
+                    label: Text('MAX: ${_maxWeight}kg', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    backgroundColor: Colors.amber.shade100,
+                    side: BorderSide.none, 
+                  ),
+              ],
+            ),
+            // 空白
+            const SizedBox(height: 8),
+            _todaysHistory.isEmpty
+              ? const Text('No records for today yet.', style: TextStyle(color: Colors.grey))
+              : Column(
+                children: _todaysHistory.map((workout) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(
+                      'Set ${workout.sets}: ${workout.weight} kg x ${workout.reps} reps',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  );
+                }).toList(),
               ),
-          ],
-        ),
-        // 空白
-        const SizedBox(height: 8),
-        _todaysHistory.isEmpty
-          ? const Text('No records for today yet.', style: TextStyle(color: Colors.grey))
-          : Column(
-            children: _todaysHistory.map((workout) {
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text(
-                  'Set ${workout.sets}: ${workout.weight} kg x ${workout.reps} reps',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              );
-            }).toList(),
+            ],
           ),
-      ],
+      ),
     );
   }
 
