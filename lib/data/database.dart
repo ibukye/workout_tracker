@@ -411,6 +411,17 @@ Future<void> deleteCategory(int categoryId) async {
     return grouped;
   }
 
+  /// 特定の日に、特定の名前のワークアウトを取得する
+  Future<List<Workout>> getWorkoutsByNameForDate(String name, DateTime date) {
+    final start = DateTime(date.year, date.month, date.day);
+    final end = start.add(const Duration(days: 1));
+
+    return (select(workouts)
+          ..where((tbl) => tbl.name.equals(name) & tbl.date.isBetweenValues(start, end))
+          ..orderBy([(w) => OrderingTerm.asc(w.sets)])) // セット順に並べる
+        .get();
+  }
+
   // ④ ワークアウトを追加するメソッド
   Future<int> insertWorkout(WorkoutsCompanion workout) {
     return into(workouts).insert(workout);
@@ -421,24 +432,16 @@ Future<void> deleteCategory(int categoryId) async {
     return (delete(workouts)..where((tbl) => tbl.id.equals(id))).go();
   }
 
-  // ⑤ 特定の種目の最大重量を取得するメソッド例
-  Future<double?> maxWeightByName(String name) async {
+  /// 特定の種目の最大重量を取得する（結果がない場合は0.0を返す）
+  Future<double> maxWeightByName(String name) async {
     final query = customSelect(
       'SELECT MAX(weight) AS max_weight FROM workouts WHERE name = ?',
       variables: [Variable.withString(name)],
       readsFrom: {workouts},
     );
     final row = await query.getSingleOrNull();
-    if (row == null) return null;
-    final maxWeight = row.data['max_weight'];
-    if (maxWeight == null) return null;
-    if (maxWeight is int) {
-      return maxWeight.toDouble();
-    } else if (maxWeight is double) {
-      return maxWeight;
-    } else {
-      return null;
-    }
+    // rowがnullの場合や、max_weightがnullの場合に0.0を返す
+    return row?.read<double>('max_weight') ?? 0.0;
   }
 }
 

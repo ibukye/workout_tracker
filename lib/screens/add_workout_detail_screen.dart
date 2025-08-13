@@ -27,6 +27,17 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
   final _repsFocusNode = FocusNode();
   final _setsFocusNode = FocusNode();
 
+  // 履歴とMAX重量を保持するState変数
+  List<Workout> _todaysHistory = [];
+  double? _maxWeight;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData(); // 初期データをロードするメソッドを呼び出す
+  }
+
   @override
   void dispose() {
     // --- 2. widgetが不要になったらリソースを解放 ---
@@ -39,6 +50,26 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
     _setsFocusNode.dispose();
 
     super.dispose();
+  }
+
+  // データを取得するメソッド
+  Future<void> _loadInitialData() async {
+    // 今日の履歴を取得
+    final history = await db.getWorkoutsByNameForDate(widget.workoutName, widget.selectedDay);
+    // Max重量を取得　
+    final max = await db.maxWeightByName(widget.workoutName);
+
+    setState(() {
+      _todaysHistory = history;
+      _maxWeight = max;
+      _isLoading = false;
+    });
+
+    // 前回の記録をヒントとしてコントローラーに設定
+    if (history.isNotEmpty) {
+      _weightController.text = history.last.weight.toString();
+      _repsController.text = history.last.reps.toString();
+    }
   }
 
   // --- 3. 保存処理をメソッドとして分離 ---
@@ -84,47 +115,103 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // input weight
-            TextField(
-              controller: _weightController, // 👈 Stateのコントローラーを使用
-              focusNode: _weightFocusNode,   // 👈 FocusNodeを紐付け
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Weight (kg)'),
-              textInputAction: TextInputAction.next, // 👈 キーボードのアクションを「次へ」に
-              onEditingComplete: () {
-                // 👈 エンターを押したら次のreps欄にフォーカスを移動
-                FocusScope.of(context).requestFocus(_repsFocusNode);
-              },
-            ),
-            // input reps
-            TextField(
-              controller: _repsController,
-              focusNode: _repsFocusNode,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'reps'),
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () {
-                // 👈 エンターを押したら次のsets欄にフォーカスを移動
-                FocusScope.of(context).requestFocus(_setsFocusNode);
-              },
-            ),
-            // input sets default is 1
-            TextField(
-              controller: _setsController,
-              focusNode: _setsFocusNode,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'sets'),
-              textInputAction: TextInputAction.done, // 👈 最後なのでアクションを「完了」に
-              onEditingComplete: _saveWorkout,       // 👈 エンターを押したら保存処理を実行
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _saveWorkout, // 👈 ボタンも同じ保存処理を呼ぶ
-              child: const Text('Save'),
+            // 履歴表示エリア
+            _buildHistorySection(),
+
+            // 中央配置のキー
+            const Spacer(),
+            
+            // 入力フォーム
+            _buildInputForm(),
+            
+            // 中央配置のキー
+            const Spacer(),
+            
+            // 下部: 保存ボタン
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saveWorkout,
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                child: const Text('Save', style: TextStyle(fontSize: 16)),
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+  // Layout
+
+  // 履歴表示
+  Widget _buildHistorySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text("Today's History", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            if (_maxWeight != null) 
+              Chip(
+                label: Text('MAX: ${_maxWeight}kg', style: const TextStyle(fontWeight: FontWeight.bold)),
+                backgroundColor: Colors.amber.shade100,
+                side: BorderSide.none, 
+              ),
+          ],
+        ),
+        // 空白
+        const SizedBox(height: 8),
+        _todaysHistory.isEmpty
+          ? const Text('No records for today yet.', style: TextStyle(color: Colors.grey))
+          : Column(
+            children: _todaysHistory.map((workout) {
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(
+                  'Set ${workout.sets}: ${workout.weight} kg x ${workout.reps} reps',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+
+  // 入力フォーム
+  Widget _buildInputForm() {
+    return Column(
+      children: [
+        TextField(
+            controller: _weightController,
+            focusNode: _weightFocusNode,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Weight (kg)'),
+            textInputAction: TextInputAction.next,
+            onEditingComplete: () => FocusScope.of(context).requestFocus(_repsFocusNode),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _repsController,
+            focusNode: _repsFocusNode,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Reps'),
+            textInputAction: TextInputAction.next,
+            onEditingComplete: () => FocusScope.of(context).requestFocus(_setsFocusNode),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _setsController,
+            focusNode: _setsFocusNode,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Sets'),
+            textInputAction: TextInputAction.done,
+            onEditingComplete: _saveWorkout,
+          ),
+      ],
     );
   }
 }
