@@ -84,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Text('Training Finished'),
               ),*/
               SizedBox(
-                height: MediaQuery.of(context).size.height * 0.34, 
+                height: MediaQuery.of(context).size.height * 0.35, 
                 child: TableCalendar(
                   firstDay: DateTime.utc(2025, 1, 1),
                   lastDay: DateTime.utc(2100, 12, 31),
