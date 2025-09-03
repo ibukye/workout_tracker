@@ -126,7 +126,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: Text(name),
                         subtitle: Text(sets.map((w) => '${w.weight}kg x ${w.reps}reps x ${w.sets}sets').join('\n')),
                         onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutDetailScreen(workoutName: name, selectedDay: selectedDay),),);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutDetailScreen(workoutName: name, selectedDay: selectedDay),),)
+                          .then((result) {
+                            if (result == true) {
+                              _fetchWorkoutsForDay(selectedDay);
+                            }
+                          });
                         },
                       ),
                     );

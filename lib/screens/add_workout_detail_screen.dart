@@ -5,6 +5,8 @@ import '../data/database.dart'; // WorkoutsCompanionやdbインスタンスの�
 import '../main.dart';         // scheduleNotificationやグローバル変数を使うため
 import 'main_screen.dart';      // 最後の画面遷移でMainScreenに戻るため
 
+import '../services/ad_manager.dart'; // 👈 作成したファイルをインポート
+
 // Add Workout Detail Screen
 class AddWorkoutDetailScreen extends StatefulWidget {
   final String workoutName; // TapされたworkoutNameを受け取る
@@ -128,6 +130,8 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
     );
     await db.insertWorkout(workout);
 
+    await AdManager.showInterstitialAdIfNeeded();
+
     // 以前の通知があればキャンセルし、新しい通知を30分後にスケジュールする
     await flutterLocalNotificationsPlugin.cancel(999); // 通知IDを固定してキャンセル
     await scheduleNotification(
@@ -137,7 +141,8 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
     );
 
     if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      //Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pop(true);
     }
   }
 
