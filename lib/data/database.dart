@@ -432,16 +432,23 @@ Future<void> deleteCategory(int categoryId) async {
     return (delete(workouts)..where((tbl) => tbl.id.equals(id))).go();
   }
 
-  /// 特定の種目の最大重量を取得する（結果がない場合は0.0を返す）
+   /// 特定の種目の最大重量を取得する（結果がない場合は0.0を返す）
   Future<double> maxWeightByName(String name) async {
     final query = customSelect(
       'SELECT MAX(weight) AS max_weight FROM workouts WHERE name = ?',
       variables: [Variable.withString(name)],
       readsFrom: {workouts},
     );
+
     final row = await query.getSingleOrNull();
-    // rowがnullの場合や、max_weightがnullの場合に0.0を返す
-    return row?.read<double>('max_weight') ?? 0.0;
+
+    // rowがnull、またはmax_weightがnullの場合に0.0を安全に返す
+    if (row == null || row.data['max_weight'] == null) {
+      return 0.0;
+    }
+
+    // 取得した値をdoubleとして返す
+    return row.read<double>('max_weight');
   }
 }
 

@@ -23,12 +23,20 @@ void main() async {
   tz.initializeTimeZones();
   tz.setLocalLocation(tz.getLocation('Asia/Tokyo'));
 
+  const windowsInit = WindowsInitializationSettings();
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
   const iosInit = DarwinInitializationSettings(
     requestAlertPermission: true,
     requestBadgePermission: true,
     requestSoundPermission: true,
   );
+
+  const initializationSettings = InitializationSettings(
+    android: androidInit,
+    iOS: iosInit,
+    windows: windowsInit,
+  );
+
 
   // Androidのプラグインインスタンスを取得
   final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -37,9 +45,7 @@ void main() async {
     await androidPlugin.requestExactAlarmsPermission();
   }
 
-  await flutterLocalNotificationsPlugin.initialize(
-    const InitializationSettings(android: androidInit, iOS: iosInit),
-  );
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   runApp(
     ChangeNotifierProvider(
