@@ -23,15 +23,15 @@ void main() async {
   tz.initializeTimeZones();
   tz.setLocalLocation(tz.getLocation('Asia/Tokyo'));
 
-  const windowsInit = WindowsInitializationSettings();
-  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const iosInit = DarwinInitializationSettings(
+  final androidInit = const AndroidInitializationSettings('@mipmap/ic_launcher');
+  final iosInit = const DarwinInitializationSettings(
     requestAlertPermission: true,
     requestBadgePermission: true,
     requestSoundPermission: true,
   );
+  final windowsInit = const WindowsInitializationSettings(appName: "workout tracker", appUserModelId: "com.ibukye.workout_tracker", guid: "863cda43-0856-4931-aa2e-c7d00b889280");
 
-  const initializationSettings = InitializationSettings(
+  final initializationSettings = InitializationSettings(
     android: androidInit,
     iOS: iosInit,
     windows: windowsInit,
