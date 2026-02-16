@@ -23,12 +23,20 @@ void main() async {
   tz.initializeTimeZones();
   tz.setLocalLocation(tz.getLocation('Asia/Tokyo'));
 
-  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const iosInit = DarwinInitializationSettings(
+  final androidInit = const AndroidInitializationSettings('@mipmap/ic_launcher');
+  final iosInit = const DarwinInitializationSettings(
     requestAlertPermission: true,
     requestBadgePermission: true,
     requestSoundPermission: true,
   );
+  final windowsInit = const WindowsInitializationSettings(appName: "workout tracker", appUserModelId: "com.ibukye.workout_tracker", guid: "863cda43-0856-4931-aa2e-c7d00b889280");
+
+  final initializationSettings = InitializationSettings(
+    android: androidInit,
+    iOS: iosInit,
+    windows: windowsInit,
+  );
+
 
   // Androidのプラグインインスタンスを取得
   final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -37,9 +45,7 @@ void main() async {
     await androidPlugin.requestExactAlarmsPermission();
   }
 
-  await flutterLocalNotificationsPlugin.initialize(
-    const InitializationSettings(android: androidInit, iOS: iosInit),
-  );
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   runApp(
     ChangeNotifierProvider(

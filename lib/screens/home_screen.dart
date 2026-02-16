@@ -22,7 +22,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _todaysWorkouts = db.getWorkoutsByName(today: DateTime.now());
+    // 初期化時は空のFutureを設定（didChangeDependenciesで実際のデータを取得）
+    _todaysWorkouts = Future.value({});
     _loadWorkoutDates(); // 初回ロード
   }
 
@@ -126,12 +127,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: Text(name),
                         subtitle: Text(sets.map((w) => '${w.weight}kg x ${w.reps}reps x ${w.sets}sets').join('\n')),
                         onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => AddWorkoutDetailScreen(workoutName: name, selectedDay: selectedDay),),)
-                          .then((result) {
-                            if (result == true) {
-                              _fetchWorkoutsForDay(selectedDay);
-                            }
-                          });
+                          Navigator.push(
+                          context, 
+                          MaterialPageRoute(
+                            builder: (_) => AddWorkoutDetailScreen(
+                              workoutName: name, 
+                              selectedDay: selectedDay
+                            ),
+                          ),
+                        ).then((result) {
+                          if (result == true) {
+                            _fetchWorkoutsForDay(selectedDay); // この部分で更新されます
+                          }
+                        });
                         },
                       ),
                     );

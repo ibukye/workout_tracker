@@ -178,8 +178,12 @@ class _AddWorkoutScreenState extends State<AddWorkoutScreen> {
                                               selectedDay: day,
                                             ),
                                           ),
-                                        ).then((_) => _refreshData());
-                                      },
+                                        ).then((result) {
+                                          if (result == true) {
+                                            _refreshData();
+                                          }
+                                        });
+                                      }
                                     ),
                                     const Divider(height: 1, thickness: 0.5), // ← 線を追加
                                   ]

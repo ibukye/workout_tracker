@@ -142,7 +142,14 @@ class _AddWorkoutDetailScreenState extends State<AddWorkoutDetailScreen> {
 
     if (mounted) {
       //Navigator.of(context).popUntil((route) => route.isFirst);
-      Navigator.of(context).pop(true);
+      //Navigator.of(context).pop(true);
+      //Navigator.pop(context, true);
+      // MainScreenのHomeタブ（インデックス0）に戻る
+      Navigator.pushAndRemoveUntil(
+        context, 
+        MaterialPageRoute(builder: (_) => const MainScreen(initialIndex: 0)),
+        (route) => false, // すべての既存routeを削除
+      );
     }
   }
 
